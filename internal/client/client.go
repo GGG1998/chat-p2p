@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"grpcTests/proto"
+	"io"
 	"log"
 )
 
@@ -35,6 +36,9 @@ func (c *Client) SendMessage(message string) error {
 func (c *Client) ReceiveMessages() {
 	for {
 		msg, err := c.stream.Recv()
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
 			break
 		}
@@ -48,11 +52,10 @@ func (c *Client) Connect(serverID string) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
 
 	c.client = proto.NewChatClient(conn)
-
 	c.stream, err = c.client.SendMessage(context.Background())
+
 	if err != nil {
 		return fmt.Errorf("create stream error: %v", err)
 	}

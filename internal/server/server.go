@@ -2,13 +2,11 @@ package server
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"grpcTests/proto"
-	"log"
-	"math/rand"
 	"net"
 	"sync"
-	"time"
 )
 
 type WrapperServer interface {
@@ -28,7 +26,7 @@ func (s *Server) broadcastMessage(msg *proto.ChatMessage) {
 
 	for client := range s.clients {
 		if err := client.Send(msg); err != nil {
-			log.Printf("Błąd podczas wysyłania wiadomości do klienta: %v", err)
+			log.Printf("Error send: %v", err)
 		}
 	}
 }
@@ -38,10 +36,11 @@ func (s *Server) SendMessage(stream proto.Chat_SendMessageServer) error {
 	s.clients[stream] = true
 	s.mu.Unlock()
 
+	var _err error
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
-			log.Printf("Error during recv from client: %v", err)
+			_err = err
 			break
 		}
 
@@ -52,16 +51,13 @@ func (s *Server) SendMessage(stream proto.Chat_SendMessageServer) error {
 	delete(s.clients, stream)
 	s.mu.Unlock()
 
-	return nil
+	return _err
 }
 
-func (s *Server) Run() error {
-	source := rand.NewSource(time.Now().UnixNano())
-	random := rand.New(source)
-	port := fmt.Sprintf(":800%d", random.Intn(9))
+func (s *Server) Run(port string) error {
 	socket, err := net.Listen("tcp", port)
 
-	fmt.Printf("\nYour port %s \n", port)
+	log.Infof("\nYour port %s \n", port)
 
 	if err != nil {
 		panic(err)
@@ -69,6 +65,7 @@ func (s *Server) Run() error {
 
 	rpc := grpc.NewServer()
 	proto.RegisterChatServer(rpc, s)
+
 	if socket == nil {
 		return fmt.Errorf("socket is nil")
 	}
@@ -77,6 +74,7 @@ func (s *Server) Run() error {
 		return err
 	}
 	s.srv = rpc
+
 	return nil
 }
 

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"grpcTests/internal/client"
+	"grpcTests/internal/network"
 	"grpcTests/internal/server"
-	"log"
 	"sync"
 )
 
@@ -14,7 +14,7 @@ type App struct {
 	client *client.Client
 }
 
-func (a *App) Run(ctx context.Context) {
+func (a *App) Run() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -26,7 +26,7 @@ func (a *App) Run(ctx context.Context) {
 	for {
 		msg, _ := a.client.Prompt.Write("")
 		if err := a.client.SendMessage(msg); err != nil {
-			log.Printf("Error sending message")
+			log.Errorln("Error sending message")
 		}
 	}
 }
@@ -35,11 +35,12 @@ func NewApp() (*App, error) {
 	srv := server.NewServer()
 
 	// Create own "room" think that is private user
-	go func() {
-		if err := srv.Run(); err != nil {
-			fmt.Println("Error serving", err)
+	port := network.RandomPort()
+	go func(p string) {
+		if err := srv.Run(p); err != nil {
+			log.Errorln("Error serving", err)
 		}
-	}()
+	}(port)
 
 	serverId, err := client.NewPrompt().Write("serverID")
 	if err != nil {
@@ -63,5 +64,5 @@ func main() {
 		_ = fmt.Errorf("app error: %w", err)
 	}
 
-	app.Run(context.Background())
+	app.Run()
 }
